@@ -162,8 +162,13 @@ Note: The SQLite database uses Bun's built-in `bun:sqlite` module. No extra depe
 AegisChat/
 ├── aegis.db                    # Local SQLite database (scam hashes + pending queue)
 ├── .github/
-│   └── workflows/
-│       └── ci.yml
+│   ├── ISSUE_TEMPLATE/
+│   │   ├── bug_report.md
+│   │   ├── feature_request.md
+│   │   └── false_detection.md
+│   ├── workflows/
+│   │   └── ci.yml
+│   └── PULL_REQUEST_TEMPLATE.md
 ├── src/
 │   ├── config/
 │   │   └── index.js
