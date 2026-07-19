@@ -8,6 +8,6 @@ How did you verify this works? (manual run, specific messages/images tested, etc
 
 ## Checklist
 
-- [ ] Ran `bun run format` (or `bun run format:check` passes)
+- [ ] Ran `npm run format` (or `npm run format:check` passes)
 - [ ] Verified the bot starts and connects without errors
 - [ ] No secrets or tokens included in the diff

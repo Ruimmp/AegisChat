@@ -1,3 +1,4 @@
+const path = require('path');
 require('dotenv').config();
 
 const REQUIRED = ['DISCORD_BOT_TOKEN', 'OPENROUTER_API_KEY', 'GUILD_ID', 'LOG_CHANNEL_ID'];
@@ -18,6 +19,7 @@ const config = {
   reviewThreshold: parseInt(process.env.REVIEW_THRESHOLD || '60', 10),
   phashThreshold: parseInt(process.env.PHASH_THRESHOLD || '14', 10),
   logLevel: process.env.LOG_LEVEL || 'info',
+  dbPath: process.env.DB_PATH || path.join(__dirname, '..', '..', 'aegis.db'),
 };
 
 module.exports = config;

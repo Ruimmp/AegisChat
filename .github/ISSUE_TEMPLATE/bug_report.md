@@ -22,6 +22,6 @@ Relevant console output (set `LOG_LEVEL=debug` in `.env` for more detail). Redac
 
 **Environment**
 
-- Bun version:
+- Node version:
 - OS:
 - Relevant `.env` settings (thresholds, model — no secrets):
