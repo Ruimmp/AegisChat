@@ -1,14 +1,15 @@
-const { Database } = require('bun:sqlite');
+const Database = require('better-sqlite3');
+const fs = require('fs');
 const path = require('path');
 const { log } = require('../utils/logger');
 const { hammingDistance } = require('../utils/perceptualHash');
-const { phashThreshold } = require('../config');
+const { phashThreshold, dbPath } = require('../config');
 
-const DB_PATH = path.join(__dirname, '..', '..', 'aegis.db');
+fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
-const db = new Database(DB_PATH);
+const db = new Database(dbPath);
 
-db.run(`PRAGMA journal_mode = WAL`);
+db.exec('PRAGMA journal_mode = WAL');
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS scam_images (
@@ -19,7 +20,7 @@ db.exec(`
 `);
 
 try {
-  db.run(`ALTER TABLE scam_images ADD COLUMN phash TEXT`);
+  db.exec(`ALTER TABLE scam_images ADD COLUMN phash TEXT`);
 } catch (err) {
   if (!err.message.includes('duplicate column')) {
     log.warn(`Failed to migrate scam_images table: ${err.message}`);

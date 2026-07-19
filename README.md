@@ -4,7 +4,7 @@ Open-source Discord bot for real-time scam detection using hybrid analysis (heur
 
 ## Requirements
 
-- [Bun](https://bun.sh) >= 1.0 installed
+- [Node.js](https://nodejs.org) >= 18 installed
 - A Discord Bot Token with **Message Content Intent** enabled
 - An [OpenRouter](https://openrouter.ai) account
 
@@ -13,7 +13,7 @@ Open-source Discord bot for real-time scam detection using hybrid analysis (heur
 ```bash
 git clone https://github.com/Ruimmp/AegisChat.git
 cd AegisChat
-bun install
+npm install
 ```
 
 ## Configuration
@@ -38,6 +38,9 @@ PHASH_THRESHOLD=14
 
 # Logging
 LOG_LEVEL=info
+
+# Storage (optional, defaults to aegis.db in the project root)
+DB_PATH=
 ```
 
 ## Discord Bot Setup
@@ -113,16 +116,16 @@ flowchart LR
 
 ## Running the Bot
 
-Development (with bun watch):
+Development (with auto-restart on file change):
 
 ```bash
-bun run dev
+npm run dev
 ```
 
 Production:
 
 ```bash
-bun run start
+npm run start
 ```
 
 ## Confidence Thresholds
@@ -142,7 +145,7 @@ Set `LOG_LEVEL` in `.env` to control console output:
 
 ## Local Scam Image Database
 
-To reduce API calls and avoid rate limits, AegisChat uses a local SQLite database with WAL mode for durability. The database stores:
+To reduce API calls and avoid rate limits, AegisChat uses a local SQLite database ([`better-sqlite3`](https://github.com/WiseLibs/better-sqlite3)) with WAL mode for durability. On hosts where the app folder doesn't persist between redeploys, point `DB_PATH` at a directory that does, otherwise the local scam-image cache resets every time. The database stores:
 
 - `scam_images`: SHA-256 hash + perceptual hash (pHash) of confirmed scam images
 - `pending_queue`: images waiting for AI analysis when rate-limited
@@ -162,10 +165,10 @@ To reduce API calls and avoid rate limits, AegisChat uses a local SQLite databas
 The bot ships with a `seed-images/` folder containing confirmed scam samples, so a fresh install already has a starting local database instead of needing the AI to (re)learn every scam from scratch. Drop your own confirmed scam images in there and they'll be hashed and added to the local database automatically, without ever calling the AI.
 
 - Runs automatically every time the bot starts (safe to run repeatedly, duplicates are skipped).
-- Can also be run standalone: `bun run seed`.
+- Can also be run standalone: `npm run seed`.
 - Override the folder with `SEED_IMAGES_DIR=/path/to/images` (useful if you'd rather keep your own samples out of git).
 
-Perceptual hashing is computed with [`sharp`](https://sharp.pixelplumbing.com/) (image resize/grayscale), the only extra dependency beyond Bun's built-in `bun:sqlite` module.
+Perceptual hashing is computed with [`sharp`](https://sharp.pixelplumbing.com/) (image resize/grayscale).
 
 **Note on the perceptual hash**: it's robust to recompression and resizing, but not to aggressive cropping or heavy overlays. A scam image cropped down significantly may still trigger a fresh AI call. Raise `PHASH_THRESHOLD` in `.env` if similar reposts are still slipping through, keeping in mind that raising it too far increases the (still small) risk of two unrelated images being treated as the same scam.
 
@@ -211,7 +214,7 @@ AegisChat/
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/my-feature`)
 3. Commit your changes (`git commit -m 'Add my feature'`)
-4. Run `bun run format` before committing
+4. Run `npm run format` before committing
 5. Push to the branch (`git push origin feature/my-feature`)
 6. Open a Pull Request
 

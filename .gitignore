@@ -15,3 +15,6 @@ node_modules
 # OS files
 .DS_Store
 thumbs.db
+
+# Discloud
+AegisChat.zip
