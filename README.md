@@ -62,8 +62,10 @@ LOG_LEVEL=info
 
 ## How It Works
 
-- **Layer 1 - Fast Filter**: Regex and heuristic detection for known scam patterns, suspicious URLs, new accounts, suspicious attachment behavior, and images.
-- **Layer 2 - AI Analysis**: OpenRouter integration (free models) for contextual scam detection analyzing both text and images with confidence scoring.
+Text-only messages are never analyzed and never cost a token: the bot only looks at messages that include image attachments, since that is where this kind of scam actually lives.
+
+- **Layer 1 - Local DB check**: every image attachment is checked against the local SQLite database first, by exact SHA-256 hash and by perceptual hash (pHash) similarity. A match deletes the message instantly at zero AI cost. See [Local Scam Image Database](#local-scam-image-database).
+- **Layer 2 - AI escalation**: unrecognized images only reach OpenRouter when there is an actual risk signal, either the author's account is newer than 30 days, or the message carries 2 or more images at once (the common "proof screenshot" pattern for this kind of scam). A single image from an established account is skipped entirely, so normal chat activity (including keyword-heavy servers, e.g. crypto communities) never burns tokens.
 - **Layer 3 - Action**:
   - Clear scams (high confidence + delete action): message is silently deleted.
   - Ambiguous scams (medium confidence): message is kept, but logged to the admin channel for manual review.
@@ -80,18 +82,15 @@ flowchart LR
     B -- Yes --> Z["Ignore"]
     B -- No --> C{"Guild matches?"}
     C -- No --> Z
-    C -- Yes --> D["Heuristic scan Layer 1"]
-    D --> E{"Triggers found?"}
-    E -- No --> Z
-    E -- Yes --> F{"Has images?"}
-    F -- No --> G["Send text to OpenRouter AI"]
-    F -- Yes --> H{"Check SQLite local DB"}
+    C -- Yes --> D{"Has images?"}
+    D -- No --> Z
+    D -- Yes --> H{"Check SQLite local DB"}
     H -- Exact SHA-256 match --> I["Delete message confidence=100"]
     H -- Similar pHash match --> I
-    H -- Unknown --> J["Download image base64"]
-    J --> K["Send image + text to OpenRouter AI"]
-    G --> L{"AI response?"}
-    K --> L
+    H -- Unknown --> E{"New account OR 2+ images?"}
+    E -- No --> Z
+    E -- Yes --> K["Send image + text to OpenRouter AI"]
+    K --> L{"AI response?"}
     L -- Rate limit 429 --> M["Add URL to pending queue"]
     M --> Z
     L -- Error --> N["Fallback heuristics only confidence=50"]
@@ -104,10 +103,8 @@ flowchart LR
     Q -- No --> S{"confidence >= 60?"}
     S -- Yes --> T["Log to admin channel keep message"]
     S -- No --> Z
-    R --> U{"Has images?"}
-    U -- Yes --> V["Save SHA-256 + pHash to SQLite"]
-    U -- No --> W["End"]
-    V --> W
+    R --> V["Save SHA-256 + pHash to SQLite"]
+    V --> W["End"]
     T --> W
     I --> W
     N --> W

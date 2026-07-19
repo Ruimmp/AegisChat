@@ -11,45 +11,9 @@ const {
   removeFromPendingQueue,
 } = require('./scamDatabase');
 
-const SUSPICIOUS_DOMAINS = ['bit.ly', 'tinyurl.com', 'shorturl.at', 'buff.ly', 'freebtc'];
-
-const KEYWORDS = ['btc', 'eth', 'bitcoin', 'ethereum', 'free', 'mrbeast', 'elon', 'musk'];
-
-const urlRegex = /https?:\/\/[^\s]+/i;
+const MIN_IMAGES_FOR_AI = 2;
 
 const isNewAccount = (ageDays) => ageDays < 30;
-
-const hasSuspiciousUrl = (text) => {
-  const urls = text.match(urlRegex) || [];
-  return urls.some((url) => SUSPICIOUS_DOMAINS.some((d) => url.toLowerCase().includes(d)));
-};
-
-const hasScamKeywords = (text) => {
-  const lower = text.toLowerCase();
-  return KEYWORDS.some((kw) => lower.includes(kw));
-};
-
-const scoreHeuristic = (text, ageDays, recentMessages, attachments = []) => {
-  const triggers = [];
-
-  if (hasSuspiciousUrl(text)) triggers.push('suspicious_url');
-  if (hasScamKeywords(text)) triggers.push('scam_keywords');
-
-  if (isNewAccount(ageDays)) triggers.push('new_account');
-  if (recentMessages > 20 && hasScamKeywords(text)) triggers.push('high_velocity');
-
-  const hasAttachments = attachments.length > 0;
-  const isLowText = !text || text.trim().length <= 5;
-  if (isNewAccount(ageDays) && hasAttachments && isLowText) {
-    triggers.push('suspicious_behavior');
-  }
-
-  if (hasAttachments) {
-    triggers.push('has_images');
-  }
-
-  return triggers;
-};
 
 const buildScanText = (content, attachments = []) => {
   const parts = [content];
@@ -75,16 +39,14 @@ const fetchImageData = async (urls = [], maxImages = 3) => {
 };
 
 const scan = async (content, userContext, attachments = []) => {
-  const scanText = buildScanText(content, attachments);
-  const { ageDays, recentMessages } = userContext;
-  const triggers = scoreHeuristic(scanText, ageDays, recentMessages, attachments);
+  const imageUrls = attachments.filter((a) => a.url).map((a) => a.url);
 
-  if (triggers.length === 0) {
-    return { action: 'ignore', confidence: 0, reason: 'No heuristics triggered', triggers: [] };
+  if (imageUrls.length === 0) {
+    return { action: 'ignore', confidence: 0, reason: 'No images to analyze', triggers: [] };
   }
 
-  const imageUrls = attachments.filter((a) => a.url).map((a) => a.url);
-  log.debug(`Scan triggered with triggers=${JSON.stringify(triggers)} images=${imageUrls.length}`);
+  const { ageDays } = userContext;
+  const scanText = buildScanText(content, attachments);
 
   const images = await fetchImageData(imageUrls);
   log.debug(`Downloaded ${images.length} image(s) for analysis`);
@@ -97,7 +59,7 @@ const scan = async (content, userContext, attachments = []) => {
       confidence: 100,
       reason: 'Known scam image from local database',
       action: 'delete',
-      triggers: [...triggers, 'known_scam_image'],
+      triggers: ['known_scam_image'],
     };
   }
 
@@ -111,11 +73,18 @@ const scan = async (content, userContext, attachments = []) => {
         confidence: 100,
         reason: 'Visually similar to a known scam image in local database',
         action: 'delete',
-        triggers: [...triggers, 'known_scam_image_similar'],
+        triggers: ['known_scam_image_similar'],
       };
     }
   }
 
+  const shouldEscalateToAI = isNewAccount(ageDays) || images.length >= MIN_IMAGES_FOR_AI;
+  if (!shouldEscalateToAI) {
+    log.debug(`Skipping AI: established account with ${images.length} unrecognized image(s)`);
+    return { action: 'ignore', confidence: 0, reason: 'Established account, single unrecognized image', triggers: [] };
+  }
+
+  const triggers = [isNewAccount(ageDays) ? 'new_account' : 'multi_image_burst'];
   const imagesBase64 = images.map((img) => img.base64);
   const aiResult = await analyzeMessage(scanText, userContext, imagesBase64);
 
@@ -188,4 +157,4 @@ const processPendingQueue = async () => {
   }
 };
 
-module.exports = { scan, hasSuspiciousUrl, hasScamKeywords, buildScanText, processPendingQueue };
+module.exports = { scan, buildScanText, processPendingQueue };
