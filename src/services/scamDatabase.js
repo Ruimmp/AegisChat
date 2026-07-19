@@ -1,6 +1,8 @@
 const { Database } = require('bun:sqlite');
 const path = require('path');
 const { log } = require('../utils/logger');
+const { hammingDistance } = require('../utils/perceptualHash');
+const { phashThreshold } = require('../config');
 
 const DB_PATH = path.join(__dirname, '..', '..', 'aegis.db');
 
@@ -15,6 +17,14 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now'))
   )
 `);
+
+try {
+  db.run(`ALTER TABLE scam_images ADD COLUMN phash TEXT`);
+} catch (err) {
+  if (!err.message.includes('duplicate column')) {
+    log.warn(`Failed to migrate scam_images table: ${err.message}`);
+  }
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS pending_queue (
@@ -34,13 +44,27 @@ const isKnownScamImageHash = (hash) => {
   }
 };
 
-const addScamImage = (hash, url) => {
+const addScamImage = (hash, url, phash = null) => {
   if (!hash) return;
   try {
-    const stmt = db.prepare('INSERT OR IGNORE INTO scam_images (hash, url) VALUES (?, ?)');
-    stmt.run(hash, url);
+    const stmt = db.prepare('INSERT OR IGNORE INTO scam_images (hash, url, phash) VALUES (?, ?, ?)');
+    stmt.run(hash, url, phash);
   } catch (err) {
     log.warn(`Failed to add scam image: ${err.message}`);
+  }
+};
+
+const findSimilarScamImage = (phash, threshold = phashThreshold) => {
+  if (!phash) return null;
+  try {
+    const rows = db.prepare('SELECT hash, url, phash FROM scam_images WHERE phash IS NOT NULL').all();
+    for (const row of rows) {
+      if (hammingDistance(phash, row.phash) <= threshold) return row;
+    }
+    return null;
+  } catch (err) {
+    log.warn(`Failed to search similar scam images: ${err.message}`);
+    return null;
   }
 };
 
@@ -82,6 +106,7 @@ const clearPendingQueue = () => {
 
 module.exports = {
   isKnownScamImageHash,
+  findSimilarScamImage,
   addScamImage,
   addToPendingQueue,
   removeFromPendingQueue,

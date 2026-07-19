@@ -3,14 +3,21 @@ const config = require('./config');
 const { log } = require('./utils/logger');
 const { setupMessageCreate } = require('./events/messageCreate');
 const { processPendingQueue } = require('./services/scamDetector');
+const { seedScamImages } = require('../scripts/seedScamImages');
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
 });
 
-client.once('clientReady', () => {
+client.once('clientReady', async () => {
   log.info(`Logged in as ${client.user.tag}`);
   log.info(`Guilds: ${client.guilds.cache.map((g) => `${g.name} (${g.id})`).join(', ') || 'None'}`);
+
+  try {
+    await seedScamImages();
+  } catch (err) {
+    log.error(`Startup image seeding failed: ${err.message}`);
+  }
 
   const queueInterval = setInterval(
     async () => {

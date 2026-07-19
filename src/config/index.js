@@ -16,6 +16,7 @@ const config = {
   logChannelId: process.env.LOG_CHANNEL_ID,
   confidenceThreshold: parseInt(process.env.CONFIDENCE_THRESHOLD || '85', 10),
   reviewThreshold: parseInt(process.env.REVIEW_THRESHOLD || '60', 10),
+  phashThreshold: parseInt(process.env.PHASH_THRESHOLD || '14', 10),
   logLevel: process.env.LOG_LEVEL || 'info',
 };
 
