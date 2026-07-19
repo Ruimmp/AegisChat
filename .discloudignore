@@ -1,0 +1,28 @@
+# Dependencies
+node_modules
+
+# Version control
+.git
+.github
+.gitignore
+
+# SQLite database files
+*.db
+*-wal
+*-shm
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+thumbs.db
+
+# Dev tooling
+.prettierignore
+.prettierrc
+.env.example
+
+# Docs
+README.md
+LICENSE
