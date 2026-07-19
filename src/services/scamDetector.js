@@ -1,7 +1,15 @@
 const { log } = require('../utils/logger');
 const { analyzeMessage } = require('./ai.service');
 const { downloadImageBuffer, toBase64DataUrl, computeImageHash } = require('../utils/imageDownloader');
-const { isKnownScamImageHash, addScamImage, addToPendingQueue, getPendingQueue, removeFromPendingQueue } = require('./scamDatabase');
+const { computePerceptualHash } = require('../utils/perceptualHash');
+const {
+  isKnownScamImageHash,
+  findSimilarScamImage,
+  addScamImage,
+  addToPendingQueue,
+  getPendingQueue,
+  removeFromPendingQueue,
+} = require('./scamDatabase');
 
 const SUSPICIOUS_DOMAINS = ['bit.ly', 'tinyurl.com', 'shorturl.at', 'buff.ly', 'freebtc'];
 
@@ -59,8 +67,9 @@ const fetchImageData = async (urls = [], maxImages = 3) => {
     const downloaded = await downloadImageBuffer(url);
     if (!downloaded) continue;
     const hash = computeImageHash(downloaded.buffer);
+    const phash = await computePerceptualHash(downloaded.buffer);
     const base64 = toBase64DataUrl(downloaded.buffer, downloaded.mimeType);
-    results.push({ url, hash, base64 });
+    results.push({ url, hash, phash, base64 });
   }
   return results;
 };
@@ -82,7 +91,7 @@ const scan = async (content, userContext, attachments = []) => {
 
   const knownScamImage = images.find((img) => isKnownScamImageHash(img.hash));
   if (knownScamImage) {
-    log.debug(`Known scam image detected: ${knownScamImage.url}`);
+    log.debug(`Known scam image detected (exact match): ${knownScamImage.url}`);
     return {
       isScam: true,
       confidence: 100,
@@ -90,6 +99,21 @@ const scan = async (content, userContext, attachments = []) => {
       action: 'delete',
       triggers: [...triggers, 'known_scam_image'],
     };
+  }
+
+  for (const img of images) {
+    const similar = findSimilarScamImage(img.phash);
+    if (similar) {
+      log.debug(`Known scam image detected (similar, hash=${img.phash} matched ${similar.phash}): ${img.url}`);
+      addScamImage(img.hash, img.url, img.phash);
+      return {
+        isScam: true,
+        confidence: 100,
+        reason: 'Visually similar to a known scam image in local database',
+        action: 'delete',
+        triggers: [...triggers, 'known_scam_image_similar'],
+      };
+    }
   }
 
   const imagesBase64 = images.map((img) => img.base64);
@@ -107,7 +131,7 @@ const scan = async (content, userContext, attachments = []) => {
 
   if (aiResult.isScam && images.length > 0) {
     for (const img of images) {
-      addScamImage(img.hash, img.url);
+      addScamImage(img.hash, img.url, img.phash);
     }
     log.debug(`Added ${images.length} scam image(s) to local database`);
   }
@@ -136,6 +160,15 @@ const processPendingQueue = async () => {
       continue;
     }
 
+    const phash = await computePerceptualHash(downloaded.buffer);
+    const similar = findSimilarScamImage(phash);
+    if (similar) {
+      log.debug(`Pending image matches known scam image (similar): ${url}`);
+      addScamImage(hash, url, phash);
+      removeFromPendingQueue(url);
+      continue;
+    }
+
     const base64 = toBase64DataUrl(downloaded.buffer, downloaded.mimeType);
     const aiResult = await analyzeMessage('', { ageDays: 999, recentMessages: 0 }, [base64]);
 
@@ -145,7 +178,7 @@ const processPendingQueue = async () => {
     }
 
     if (aiResult.isScam) {
-      addScamImage(hash, url);
+      addScamImage(hash, url, phash);
       log.info(`Pending image confirmed as scam and added to database: ${url}`);
     } else {
       log.debug(`Pending image cleared by AI: ${url}`);

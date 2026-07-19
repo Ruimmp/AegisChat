@@ -34,6 +34,7 @@ OPENROUTER_MODEL=openrouter/free
 # Detection thresholds
 CONFIDENCE_THRESHOLD=85
 REVIEW_THRESHOLD=60
+PHASH_THRESHOLD=14
 
 # Logging
 LOG_LEVEL=info
@@ -85,7 +86,8 @@ flowchart LR
     E -- Yes --> F{"Has images?"}
     F -- No --> G["Send text to OpenRouter AI"]
     F -- Yes --> H{"Check SQLite local DB"}
-    H -- Known scam hash --> I["Delete message confidence=100"]
+    H -- Exact SHA-256 match --> I["Delete message confidence=100"]
+    H -- Similar pHash match --> I
     H -- Unknown --> J["Download image base64"]
     J --> K["Send image + text to OpenRouter AI"]
     G --> L{"AI response?"}
@@ -103,7 +105,7 @@ flowchart LR
     S -- Yes --> T["Log to admin channel keep message"]
     S -- No --> Z
     R --> U{"Has images?"}
-    U -- Yes --> V["Save image hash to SQLite"]
+    U -- Yes --> V["Save SHA-256 + pHash to SQLite"]
     U -- No --> W["End"]
     V --> W
     T --> W
@@ -130,6 +132,7 @@ bun run start
 
 - `CONFIDENCE_THRESHOLD` (default: 85): Messages above this confidence with delete action are deleted automatically.
 - `REVIEW_THRESHOLD` (default: 60): Messages between this and `CONFIDENCE_THRESHOLD` are logged to the admin channel for manual review but are NOT deleted.
+- `PHASH_THRESHOLD` (default: 14): Max Hamming distance (0-64) for two images to be considered the same scam image. Lower = stricter matching (more AI calls), higher = looser matching (more cache hits, small risk of false-positive matches). See [Local Scam Image Database](#local-scam-image-database).
 
 ## Logging
 
@@ -144,17 +147,30 @@ Set `LOG_LEVEL` in `.env` to control console output:
 
 To reduce API calls and avoid rate limits, AegisChat uses a local SQLite database with WAL mode for durability. The database stores:
 
-- `scam_images`: SHA-256 hashes of confirmed scam images
+- `scam_images`: SHA-256 hash + perceptual hash (pHash) of confirmed scam images
 - `pending_queue`: images waiting for AI analysis when rate-limited
 
 **How it works:**
 
-1. First time a new scam image is detected, the AI analyzes it and its hash is saved in SQLite.
-2. Future messages with the same image are deleted immediately without calling the AI.
-3. If OpenRouter is rate-limited, image URLs are queued in SQLite and retried every 5 minutes automatically.
-4. Once the AI recovers and confirms a queued image as scam, it is added to the local database for instant future blocking.
+1. First time a new scam image is detected, the AI analyzes it and both its SHA-256 hash and perceptual hash (pHash) are saved in SQLite.
+2. Future messages are checked against the local DB in two steps before ever calling the AI:
+   - **Exact match**: SHA-256 hash lookup (byte-for-byte identical file).
+   - **Similarity match**: perceptual hash (dHash) compared via Hamming distance against every stored image. Scammers rarely repost the exact same file, since they recompress, resize, or slightly crop it, so the exact hash alone misses most reposts. The perceptual hash catches these near-duplicates (distance ≤ `PHASH_THRESHOLD`) without needing the AI again.
+3. If either check matches, the message is deleted immediately with confidence 100 and no AI call is made.
+4. If OpenRouter is rate-limited, image URLs are queued in SQLite and retried every 5 minutes automatically.
+5. Once the AI recovers and confirms a queued image as scam, it is added to the local database (both hashes) for instant future blocking.
 
-Note: The SQLite database uses Bun's built-in `bun:sqlite` module. No extra dependencies are required.
+### Pre-seeding known scam images
+
+The bot ships with a `seed-images/` folder containing confirmed scam samples, so a fresh install already has a starting local database instead of needing the AI to (re)learn every scam from scratch. Drop your own confirmed scam images in there and they'll be hashed and added to the local database automatically, without ever calling the AI.
+
+- Runs automatically every time the bot starts (safe to run repeatedly, duplicates are skipped).
+- Can also be run standalone: `bun run seed`.
+- Override the folder with `SEED_IMAGES_DIR=/path/to/images` (useful if you'd rather keep your own samples out of git).
+
+Perceptual hashing is computed with [`sharp`](https://sharp.pixelplumbing.com/) (image resize/grayscale), the only extra dependency beyond Bun's built-in `bun:sqlite` module.
+
+**Note on the perceptual hash**: it's robust to recompression and resizing, but not to aggressive cropping or heavy overlays. A scam image cropped down significantly may still trigger a fresh AI call. Raise `PHASH_THRESHOLD` in `.env` if similar reposts are still slipping through, keeping in mind that raising it too far increases the (still small) risk of two unrelated images being treated as the same scam.
 
 ## Project Structure
 
@@ -169,6 +185,9 @@ AegisChat/
 │   ├── workflows/
 │   │   └── ci.yml
 │   └── PULL_REQUEST_TEMPLATE.md
+├── scripts/
+│   └── seedScamImages.js       # Pre-populates the local DB from seed-images/
+├── seed-images/                # Bundled scam image samples used to pre-populate the local DB
 ├── src/
 │   ├── config/
 │   │   └── index.js
@@ -180,6 +199,7 @@ AegisChat/
 │   │   └── messageCreate.js
 │   ├── utils/
 │   │   ├── imageDownloader.js
+│   │   ├── perceptualHash.js
 │   │   └── logger.js
 │   └── index.js
 ├── .env.example
