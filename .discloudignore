@@ -7,12 +7,9 @@ node_modules
 .gitignore
 
 # SQLite database files
-*.db
-*-wal
-*-shm
-
-# Logs
-*.log
+aegis.db
+aegis.db-wal
+aegis.db-shm
 
 # OS files
 .DS_Store

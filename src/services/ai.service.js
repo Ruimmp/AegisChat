@@ -89,12 +89,13 @@ const analyzeMessage = async (content, userContext, imagesBase64 = []) => {
   if (!result) return null;
 
   const confidence = typeof result.confidence === 'number' ? result.confidence : 0;
+  const action = ['delete', 'warn', 'ignore'].includes(result.action) ? result.action : 'ignore';
 
   return {
-    isScam: result.isScam === true,
+    isScam: result.isScam === true || action === 'delete',
     confidence: Math.min(Math.max(confidence, 0), 100),
     reason: typeof result.reason === 'string' ? result.reason : 'No reason provided',
-    action: ['delete', 'warn', 'ignore'].includes(result.action) ? result.action : 'ignore',
+    action,
   };
 };
 
