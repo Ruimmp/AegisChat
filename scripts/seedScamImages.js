@@ -4,6 +4,7 @@ const { log } = require('../src/utils/logger');
 const { computeImageHash } = require('../src/utils/imageDownloader');
 const { computePerceptualHash } = require('../src/utils/perceptualHash');
 const { addScamImage } = require('../src/services/scamDatabase');
+const { learnedImagesDir } = require('../src/config');
 
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
 const SEED_DIR = process.env.SEED_IMAGES_DIR || path.join(__dirname, '..', 'seed-images');
@@ -23,7 +24,7 @@ const walkImages = (dir) => {
   return files;
 };
 
-const seedScamImages = async (dir = SEED_DIR) => {
+const seedFromDir = async (dir, urlPrefix) => {
   const files = walkImages(dir);
   if (files.length === 0) {
     log.debug(`No seed images found in ${dir}`);
@@ -35,12 +36,18 @@ const seedScamImages = async (dir = SEED_DIR) => {
     const buffer = fs.readFileSync(filePath);
     const hash = computeImageHash(buffer);
     const phash = await computePerceptualHash(buffer);
-    addScamImage(hash, `local-seed://${path.relative(dir, filePath)}`, phash);
+    addScamImage(hash, `${urlPrefix}${path.relative(dir, filePath)}`, phash);
     seeded++;
   }
 
   log.info(`Seeded ${seeded} scam image(s) from ${dir} into local database`);
   return seeded;
+};
+
+const seedScamImages = async (dir = SEED_DIR) => {
+  const seeded = await seedFromDir(dir, 'local-seed://');
+  const learned = await seedFromDir(learnedImagesDir, 'learned-image://');
+  return seeded + learned;
 };
 
 if (require.main === module) {
