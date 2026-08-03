@@ -20,6 +20,7 @@ const config = {
   phashThreshold: parseInt(process.env.PHASH_THRESHOLD || '14', 10),
   logLevel: process.env.LOG_LEVEL || 'info',
   dbPath: process.env.DB_PATH || path.join(__dirname, '..', '..', 'aegis.db'),
+  learnedImagesDir: process.env.LEARNED_IMAGES_DIR || path.join(__dirname, '..', '..', 'learned-images'),
 };
 
 module.exports = config;

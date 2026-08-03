@@ -41,6 +41,9 @@ LOG_LEVEL=info
 
 # Storage (optional, defaults to aegis.db in the project root)
 DB_PATH=
+
+# Learned scam image archive (optional, defaults to learned-images/ in the project root)
+LEARNED_IMAGES_DIR=
 ```
 
 ## Discord Bot Setup
@@ -168,6 +171,14 @@ The bot ships with a `seed-images/` folder containing confirmed scam samples, so
 - Can also be run standalone: `npm run seed`.
 - Override the folder with `SEED_IMAGES_DIR=/path/to/images` (useful if you'd rather keep your own samples out of git).
 
+### Learned image archive
+
+`scam_images` only stores hashes plus the original Discord CDN URL, and that URL expires after a while (it's a signed link). If the SQLite database is ever lost or reset, hashes learned at runtime can't be recovered from the URL alone. To make that knowledge durable, every image confirmed as a scam (whether by pHash similarity or by a fresh AI call) is also saved to disk in `learned-images/`, keyed by its SHA-256 hash.
+
+- Seeded back into the database automatically on every boot, alongside `seed-images/`.
+- Not tracked in git and excluded from Discloud deploys, same treatment as `aegis.db`, since it's data the bot accumulates in production rather than a curated sample set.
+- Override the folder with `LEARNED_IMAGES_DIR=/path/to/images`.
+
 Perceptual hashing is computed with [`sharp`](https://sharp.pixelplumbing.com/) (image resize/grayscale).
 
 **Note on the perceptual hash**: it's robust to recompression and resizing, but not to aggressive cropping or heavy overlays. A scam image cropped down significantly may still trigger a fresh AI call. Raise `PHASH_THRESHOLD` in `.env` if similar reposts are still slipping through, keeping in mind that raising it too far increases the (still small) risk of two unrelated images being treated as the same scam.
@@ -186,8 +197,9 @@ AegisChat/
 │   │   └── ci.yml
 │   └── PULL_REQUEST_TEMPLATE.md
 ├── scripts/
-│   └── seedScamImages.js       # Pre-populates the local DB from seed-images/
+│   └── seedScamImages.js       # Pre-populates the local DB from seed-images/ and learned-images/
 ├── seed-images/                # Bundled scam image samples used to pre-populate the local DB
+├── learned-images/             # Scam images archived at runtime
 ├── src/
 │   ├── config/
 │   │   └── index.js
@@ -199,6 +211,7 @@ AegisChat/
 │   │   └── messageCreate.js
 │   ├── utils/
 │   │   ├── imageDownloader.js
+│   │   ├── imageArchive.js
 │   │   ├── perceptualHash.js
 │   │   └── logger.js
 │   └── index.js

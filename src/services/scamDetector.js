@@ -2,6 +2,7 @@ const { log } = require('../utils/logger');
 const { analyzeMessage } = require('./ai.service');
 const { downloadImageBuffer, toBase64DataUrl, computeImageHash } = require('../utils/imageDownloader');
 const { computePerceptualHash } = require('../utils/perceptualHash');
+const { archiveScamImage } = require('../utils/imageArchive');
 const {
   isKnownScamImageHash,
   findSimilarScamImage,
@@ -33,7 +34,7 @@ const fetchImageData = async (urls = [], maxImages = 3) => {
     const hash = computeImageHash(downloaded.buffer);
     const phash = await computePerceptualHash(downloaded.buffer);
     const base64 = toBase64DataUrl(downloaded.buffer, downloaded.mimeType);
-    results.push({ url, hash, phash, base64 });
+    results.push({ url, hash, phash, base64, buffer: downloaded.buffer, mimeType: downloaded.mimeType });
   }
   return results;
 };
@@ -68,6 +69,7 @@ const scan = async (content, userContext, attachments = []) => {
     if (similar) {
       log.debug(`Known scam image detected (similar, hash=${img.phash} matched ${similar.phash}): ${img.url}`);
       addScamImage(img.hash, img.url, img.phash);
+      archiveScamImage(img.buffer, img.hash, img.mimeType);
       return {
         isScam: true,
         confidence: 100,
@@ -101,6 +103,7 @@ const scan = async (content, userContext, attachments = []) => {
   if (aiResult.isScam && images.length > 0) {
     for (const img of images) {
       addScamImage(img.hash, img.url, img.phash);
+      archiveScamImage(img.buffer, img.hash, img.mimeType);
     }
     log.debug(`Added ${images.length} scam image(s) to local database`);
   }
@@ -134,6 +137,7 @@ const processPendingQueue = async () => {
     if (similar) {
       log.debug(`Pending image matches known scam image (similar): ${url}`);
       addScamImage(hash, url, phash);
+      archiveScamImage(downloaded.buffer, hash, downloaded.mimeType);
       removeFromPendingQueue(url);
       continue;
     }
@@ -148,6 +152,7 @@ const processPendingQueue = async () => {
 
     if (aiResult.isScam) {
       addScamImage(hash, url, phash);
+      archiveScamImage(downloaded.buffer, hash, downloaded.mimeType);
       log.info(`Pending image confirmed as scam and added to database: ${url}`);
     } else {
       log.debug(`Pending image cleared by AI: ${url}`);

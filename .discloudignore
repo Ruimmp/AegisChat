@@ -11,6 +11,9 @@ aegis.db
 aegis.db-wal
 aegis.db-shm
 
+# Dynamically archived scam images
+learned-images
+
 # OS files
 .DS_Store
 thumbs.db
