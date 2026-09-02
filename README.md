@@ -34,7 +34,7 @@ OPENROUTER_MODEL=openrouter/free
 # Detection thresholds
 CONFIDENCE_THRESHOLD=85
 REVIEW_THRESHOLD=60
-PHASH_THRESHOLD=14
+PHASH_THRESHOLD=8
 
 # Logging
 LOG_LEVEL=info
@@ -70,8 +70,9 @@ LEARNED_IMAGES_DIR=
 
 Text-only messages are never analyzed and never cost a token: the bot only looks at messages that include image attachments, since that is where this kind of scam actually lives.
 
-- **Layer 1 - Local DB check**: every image attachment is checked against the local SQLite database first, by exact SHA-256 hash and by perceptual hash (pHash) similarity. A match deletes the message instantly at zero AI cost. See [Local Scam Image Database](#local-scam-image-database).
-- **Layer 2 - AI escalation**: unrecognized images only reach OpenRouter when there is an actual risk signal, either the author's account is newer than 30 days, or the message carries 2 or more images at once (the common "proof screenshot" pattern for this kind of scam). A single image from an established account is skipped entirely, so normal chat activity (including keyword-heavy servers, e.g. crypto communities) never burns tokens.
+- **Layer 0 - Image count gate**: messages with fewer than 2 image attachments are ignored outright, before any download or hash lookup happens. This kind of scam is almost always posted as a multi-image "proof" burst, so a single image never touches the local DB or the AI.
+- **Layer 1 - Local DB check**: every image attachment (once 2+ are present) is checked against the local SQLite database, by exact SHA-256 hash and by perceptual hash (pHash) similarity. A match deletes the message instantly at zero AI cost. See [Local Scam Image Database](#local-scam-image-database).
+- **Layer 2 - AI escalation**: unrecognized images reach OpenRouter for analysis.
 - **Layer 3 - Action**:
   - Clear scams (high confidence + delete action): message is silently deleted.
   - Ambiguous scams (medium confidence): message is kept, but logged to the admin channel for manual review.
@@ -90,12 +91,12 @@ flowchart LR
     C -- No --> Z
     C -- Yes --> D{"Has images?"}
     D -- No --> Z
-    D -- Yes --> H{"Check SQLite local DB"}
+    D -- Yes --> F{"2 or more images?"}
+    F -- No --> Z
+    F -- Yes --> H{"Check SQLite local DB"}
     H -- Exact SHA-256 match --> I["Delete message confidence=100"]
     H -- Similar pHash match --> I
-    H -- Unknown --> E{"New account OR 2+ images?"}
-    E -- No --> Z
-    E -- Yes --> K["Send image + text to OpenRouter AI"]
+    H -- Unknown --> K["Send image + text to OpenRouter AI"]
     K --> L{"AI response?"}
     L -- Rate limit 429 --> M["Add URL to pending queue"]
     M --> Z
@@ -135,7 +136,7 @@ npm run start
 
 - `CONFIDENCE_THRESHOLD` (default: 85): Messages above this confidence with delete action are deleted automatically.
 - `REVIEW_THRESHOLD` (default: 60): Messages between this and `CONFIDENCE_THRESHOLD` are logged to the admin channel for manual review but are NOT deleted.
-- `PHASH_THRESHOLD` (default: 14): Max Hamming distance (0-64) for two images to be considered the same scam image. Lower = stricter matching (more AI calls), higher = looser matching (more cache hits, small risk of false-positive matches). See [Local Scam Image Database](#local-scam-image-database).
+- `PHASH_THRESHOLD` (default: 8): Max Hamming distance (0-64) for two images to be considered the same scam image. Lower = stricter matching (more AI calls), higher = looser matching (more cache hits, higher risk of false-positive matches). See [Local Scam Image Database](#local-scam-image-database).
 
 ## Logging
 
@@ -171,6 +172,22 @@ The bot ships with a `seed-images/` folder containing confirmed scam samples, so
 - Can also be run standalone: `npm run seed`.
 - Override the folder with `SEED_IMAGES_DIR=/path/to/images` (useful if you'd rather keep your own samples out of git).
 
+### Removing a wrongly-flagged hash
+
+If an image gets flagged incorrectly (false positive), remove it from the local database with:
+
+```bash
+npm run unscam
+```
+
+Running it with no arguments lists every hash currently stored (hash, date, source URL) so you can identify the wrong one. Then remove it by hash:
+
+```bash
+npm run unscam -- <hash>
+```
+
+This deletes the hash from `scam_images` **and** removes the matching file from `learned-images/`. Both steps are necessary: since `learned-images/` is reseeded into the database on every boot (see [Learned image archive](#learned-image-archive)), removing only the database row would let the same wrong hash come back on the next restart.
+
 ### Learned image archive
 
 `scam_images` only stores hashes plus the original Discord CDN URL, and that URL expires after a while (it's a signed link). If the SQLite database is ever lost or reset, hashes learned at runtime can't be recovered from the URL alone. To make that knowledge durable, every image confirmed as a scam (whether by pHash similarity or by a fresh AI call) is also saved to disk in `learned-images/`, keyed by its SHA-256 hash.
@@ -197,7 +214,8 @@ AegisChat/
 │   │   └── ci.yml
 │   └── PULL_REQUEST_TEMPLATE.md
 ├── scripts/
-│   └── seedScamImages.js       # Pre-populates the local DB from seed-images/ and learned-images/
+│   ├── seedScamImages.js       # Pre-populates the local DB from seed-images/ and learned-images/
+│   └── removeScamImage.js      # Lists/removes a wrongly-flagged hash (npm run unscam)
 ├── seed-images/                # Bundled scam image samples used to pre-populate the local DB
 ├── learned-images/             # Scam images archived at runtime
 ├── src/

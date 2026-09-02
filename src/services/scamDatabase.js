@@ -69,6 +69,18 @@ const findSimilarScamImage = (phash, threshold = phashThreshold) => {
   }
 };
 
+const removeScamImage = (hash) => {
+  if (!hash) return false;
+  try {
+    const stmt = db.prepare('DELETE FROM scam_images WHERE hash = ?');
+    const result = stmt.run(hash);
+    return result.changes > 0;
+  } catch (err) {
+    log.warn(`Failed to remove scam image: ${err.message}`);
+    return false;
+  }
+};
+
 const addToPendingQueue = (url) => {
   try {
     const stmt = db.prepare('INSERT OR IGNORE INTO pending_queue (url) VALUES (?)');
@@ -109,6 +121,7 @@ module.exports = {
   isKnownScamImageHash,
   findSimilarScamImage,
   addScamImage,
+  removeScamImage,
   addToPendingQueue,
   removeFromPendingQueue,
   getPendingQueue,

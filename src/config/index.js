@@ -17,7 +17,7 @@ const config = {
   logChannelId: process.env.LOG_CHANNEL_ID,
   confidenceThreshold: parseInt(process.env.CONFIDENCE_THRESHOLD || '85', 10),
   reviewThreshold: parseInt(process.env.REVIEW_THRESHOLD || '60', 10),
-  phashThreshold: parseInt(process.env.PHASH_THRESHOLD || '14', 10),
+  phashThreshold: parseInt(process.env.PHASH_THRESHOLD || '8', 10),
   logLevel: process.env.LOG_LEVEL || 'info',
   dbPath: process.env.DB_PATH || path.join(__dirname, '..', '..', 'aegis.db'),
   learnedImagesDir: process.env.LEARNED_IMAGES_DIR || path.join(__dirname, '..', '..', 'learned-images'),

@@ -7,6 +7,7 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "seed": "node scripts/seedScamImages.js",
+    "unscam": "node scripts/removeScamImage.js",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
