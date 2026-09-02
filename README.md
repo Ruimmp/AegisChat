@@ -70,8 +70,9 @@ LEARNED_IMAGES_DIR=
 
 Text-only messages are never analyzed and never cost a token: the bot only looks at messages that include image attachments, since that is where this kind of scam actually lives.
 
-- **Layer 1 - Local DB check**: every image attachment is checked against the local SQLite database first, by exact SHA-256 hash and by perceptual hash (pHash) similarity. A match deletes the message instantly at zero AI cost. See [Local Scam Image Database](#local-scam-image-database).
-- **Layer 2 - AI escalation**: unrecognized images only reach OpenRouter when there is an actual risk signal, either the author's account is newer than 30 days, or the message carries 2 or more images at once (the common "proof screenshot" pattern for this kind of scam). A single image from an established account is skipped entirely, so normal chat activity (including keyword-heavy servers, e.g. crypto communities) never burns tokens.
+- **Layer 0 - Image count gate**: messages with fewer than 2 image attachments are ignored outright, before any download or hash lookup happens. This kind of scam is almost always posted as a multi-image "proof" burst, so a single image never touches the local DB or the AI.
+- **Layer 1 - Local DB check**: every image attachment (once 2+ are present) is checked against the local SQLite database, by exact SHA-256 hash and by perceptual hash (pHash) similarity. A match deletes the message instantly at zero AI cost. See [Local Scam Image Database](#local-scam-image-database).
+- **Layer 2 - AI escalation**: unrecognized images reach OpenRouter for analysis.
 - **Layer 3 - Action**:
   - Clear scams (high confidence + delete action): message is silently deleted.
   - Ambiguous scams (medium confidence): message is kept, but logged to the admin channel for manual review.
@@ -90,12 +91,12 @@ flowchart LR
     C -- No --> Z
     C -- Yes --> D{"Has images?"}
     D -- No --> Z
-    D -- Yes --> H{"Check SQLite local DB"}
+    D -- Yes --> F{"2 or more images?"}
+    F -- No --> Z
+    F -- Yes --> H{"Check SQLite local DB"}
     H -- Exact SHA-256 match --> I["Delete message confidence=100"]
     H -- Similar pHash match --> I
-    H -- Unknown --> E{"New account OR 2+ images?"}
-    E -- No --> Z
-    E -- Yes --> K["Send image + text to OpenRouter AI"]
+    H -- Unknown --> K["Send image + text to OpenRouter AI"]
     K --> L{"AI response?"}
     L -- Rate limit 429 --> M["Add URL to pending queue"]
     M --> Z

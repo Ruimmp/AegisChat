@@ -42,11 +42,10 @@ const fetchImageData = async (urls = [], maxImages = 3) => {
 const scan = async (content, userContext, attachments = []) => {
   const imageUrls = attachments.filter((a) => a.url).map((a) => a.url);
 
-  if (imageUrls.length === 0) {
-    return { action: 'ignore', confidence: 0, reason: 'No images to analyze', triggers: [] };
+  if (imageUrls.length < MIN_IMAGES_FOR_AI) {
+    return { action: 'ignore', confidence: 0, reason: 'Fewer than 2 images, skipping analysis', triggers: [] };
   }
 
-  const { ageDays } = userContext;
   const scanText = buildScanText(content, attachments);
 
   const images = await fetchImageData(imageUrls);
@@ -80,13 +79,13 @@ const scan = async (content, userContext, attachments = []) => {
     }
   }
 
-  const shouldEscalateToAI = isNewAccount(ageDays) || images.length >= MIN_IMAGES_FOR_AI;
-  if (!shouldEscalateToAI) {
-    log.debug(`Skipping AI: established account with ${images.length} unrecognized image(s)`);
-    return { action: 'ignore', confidence: 0, reason: 'Established account, single unrecognized image', triggers: [] };
+  if (images.length < MIN_IMAGES_FOR_AI) {
+    log.debug(`Skipping AI: only ${images.length} image(s) downloaded successfully`);
+    return { action: 'ignore', confidence: 0, reason: 'Fewer than 2 images downloaded, skipping analysis', triggers: [] };
   }
 
-  const triggers = [isNewAccount(ageDays) ? 'new_account' : 'multi_image_burst'];
+  const { ageDays } = userContext;
+  const triggers = ['multi_image_burst', ...(isNewAccount(ageDays) ? ['new_account'] : [])];
   const imagesBase64 = images.map((img) => img.base64);
   const aiResult = await analyzeMessage(scanText, userContext, imagesBase64);
 
