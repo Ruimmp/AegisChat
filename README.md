@@ -34,7 +34,7 @@ OPENROUTER_MODEL=openrouter/free
 # Detection thresholds
 CONFIDENCE_THRESHOLD=85
 REVIEW_THRESHOLD=60
-PHASH_THRESHOLD=14
+PHASH_THRESHOLD=8
 
 # Logging
 LOG_LEVEL=info
@@ -135,7 +135,7 @@ npm run start
 
 - `CONFIDENCE_THRESHOLD` (default: 85): Messages above this confidence with delete action are deleted automatically.
 - `REVIEW_THRESHOLD` (default: 60): Messages between this and `CONFIDENCE_THRESHOLD` are logged to the admin channel for manual review but are NOT deleted.
-- `PHASH_THRESHOLD` (default: 14): Max Hamming distance (0-64) for two images to be considered the same scam image. Lower = stricter matching (more AI calls), higher = looser matching (more cache hits, small risk of false-positive matches). See [Local Scam Image Database](#local-scam-image-database).
+- `PHASH_THRESHOLD` (default: 8): Max Hamming distance (0-64) for two images to be considered the same scam image. Lower = stricter matching (more AI calls), higher = looser matching (more cache hits, higher risk of false-positive matches). See [Local Scam Image Database](#local-scam-image-database).
 
 ## Logging
 
