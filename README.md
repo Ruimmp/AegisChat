@@ -171,6 +171,22 @@ The bot ships with a `seed-images/` folder containing confirmed scam samples, so
 - Can also be run standalone: `npm run seed`.
 - Override the folder with `SEED_IMAGES_DIR=/path/to/images` (useful if you'd rather keep your own samples out of git).
 
+### Removing a wrongly-flagged hash
+
+If an image gets flagged incorrectly (false positive), remove it from the local database with:
+
+```bash
+npm run unscam
+```
+
+Running it with no arguments lists every hash currently stored (hash, date, source URL) so you can identify the wrong one. Then remove it by hash:
+
+```bash
+npm run unscam -- <hash>
+```
+
+This deletes the hash from `scam_images` **and** removes the matching file from `learned-images/`. Both steps are necessary: since `learned-images/` is reseeded into the database on every boot (see [Learned image archive](#learned-image-archive)), removing only the database row would let the same wrong hash come back on the next restart.
+
 ### Learned image archive
 
 `scam_images` only stores hashes plus the original Discord CDN URL, and that URL expires after a while (it's a signed link). If the SQLite database is ever lost or reset, hashes learned at runtime can't be recovered from the URL alone. To make that knowledge durable, every image confirmed as a scam (whether by pHash similarity or by a fresh AI call) is also saved to disk in `learned-images/`, keyed by its SHA-256 hash.
@@ -197,7 +213,8 @@ AegisChat/
 │   │   └── ci.yml
 │   └── PULL_REQUEST_TEMPLATE.md
 ├── scripts/
-│   └── seedScamImages.js       # Pre-populates the local DB from seed-images/ and learned-images/
+│   ├── seedScamImages.js       # Pre-populates the local DB from seed-images/ and learned-images/
+│   └── removeScamImage.js      # Lists/removes a wrongly-flagged hash (npm run unscam)
 ├── seed-images/                # Bundled scam image samples used to pre-populate the local DB
 ├── learned-images/             # Scam images archived at runtime
 ├── src/
