@@ -237,6 +237,7 @@ AegisChat/
 ├── .gitignore
 ├── LICENSE
 ├── package.json
+├── PRIVACY.md
 └── README.md
 ```
 
@@ -248,6 +249,10 @@ AegisChat/
 4. Run `npm run format` before committing
 5. Push to the branch (`git push origin feature/my-feature`)
 6. Open a Pull Request
+
+## Privacy
+
+What the bot processes, what it stores, for how long, and how to request deletion: [PRIVACY.md](PRIVACY.md).
 
 ## License
 
