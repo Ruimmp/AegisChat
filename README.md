@@ -4,7 +4,7 @@ Open-source Discord bot for real-time scam detection using hybrid analysis (heur
 
 ## Requirements
 
-- [Node.js](https://nodejs.org) >= 18 installed
+- [Node.js](https://nodejs.org) >= 22 installed (required by `better-sqlite3` and `sharp`)
 - A Discord Bot Token with **Message Content Intent** enabled
 - An [OpenRouter](https://openrouter.ai) account
 

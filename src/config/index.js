@@ -1,5 +1,5 @@
 const path = require('path');
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 
 const REQUIRED = ['DISCORD_BOT_TOKEN', 'OPENROUTER_API_KEY', 'GUILD_ID', 'LOG_CHANNEL_ID'];
 
