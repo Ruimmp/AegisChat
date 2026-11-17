@@ -1,5 +1,5 @@
 const config = require('../config');
-const { log, formatDate, truncate } = require('../utils/logger');
+const { log, truncate } = require('../utils/logger');
 const { scan } = require('../services/scamDetector');
 
 const describeChannel = (channel) => {
@@ -82,7 +82,7 @@ const setupMessageCreate = (client) => {
               inline: true,
             },
           ],
-          timestamp: formatDate(),
+          timestamp: msg.createdAt.toISOString(),
           color: isScam ? 0xff0000 : 0xffa500,
         };
 
