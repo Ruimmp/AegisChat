@@ -12,7 +12,7 @@ The bot itself is private. There is no invite link and no public instance: a sin
 The bot only reacts to the `messageCreate` gateway event, and only for messages that satisfy **all** of the following:
 
 - the author is not a bot;
-- the message was posted in the single guild configured via `GUILD_ID`;
+- the message was posted in the single guild configured via `GUILD_ID`, in any channel the bot can read (text and announcement channels, the text chat of voice and stage channels, threads and forum posts);
 - the message carries **2 or more image attachments**.
 
 Anything else is discarded in memory immediately, before any download, hash lookup, analysis or write. **Text-only messages are never analysed and never stored.** The bot has no commands, no profiling, no analytics, and no advertising.
@@ -45,7 +45,7 @@ If the AI provider is rate-limited, the image URLs awaiting analysis are queued 
 
 **4. Moderation log (inside Discord)**
 
-When a message scores at or above the review threshold, an embed is posted to a private, moderator-only channel in the same guild. It contains the author's tag and user ID, the message text truncated to 500 characters, the confidence score and the reason. This data stays on Discord and is subject to Discord's own retention; it is not copied off-platform.
+When a message scores at or above the review threshold, an embed is posted to a private, moderator-only channel in the same guild. It contains the author's tag and user ID, a reference to the channel or thread the message came from, a link to the message, the message text truncated to 500 characters, the confidence score and the reason. This data stays on Discord and is subject to Discord's own retention; it is not copied off-platform.
 
 **5. Runtime console logs**
 
