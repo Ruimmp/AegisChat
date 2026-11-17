@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const config = require('./config');
 const { log } = require('./utils/logger');
 const { setupMessageCreate } = require('./events/messageCreate');
@@ -7,6 +7,7 @@ const { seedScamImages } = require('../scripts/seedScamImages');
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+  partials: [Partials.Channel],
 });
 
 client.once('clientReady', async () => {
