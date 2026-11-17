@@ -2,10 +2,17 @@ const config = require('../config');
 const { log, formatDate, truncate } = require('../utils/logger');
 const { scan } = require('../services/scamDetector');
 
+const describeChannel = (channel) => {
+  if (!channel) return 'unknown';
+  if (channel.isThread()) return `thread '${channel.name || channel.id}' under #${channel.parent?.name || channel.parentId || 'unknown'}`;
+  if (channel.isVoiceBased()) return `voice chat of '${channel.name || channel.id}'`;
+  return `#${channel.name || channel.id}`;
+};
+
 const setupMessageCreate = (client) => {
   client.on('messageCreate', async (msg) => {
     log.debug(
-      `Received message from ${msg.author.tag} in guild ${msg.guildId}: ${truncate(msg.content || '[no text]', 100)} attachments=${msg.attachments.size}`
+      `Received message from ${msg.author.tag} in guild ${msg.guildId} (${describeChannel(msg.channel)}): ${truncate(msg.content || '[no text]', 100)} attachments=${msg.attachments.size}`
     );
 
     if (msg.author.bot) {
@@ -44,7 +51,7 @@ const setupMessageCreate = (client) => {
     const deleted = isScam && confidence >= config.confidenceThreshold && result.action === 'delete';
 
     log.info(
-      `USER: ${msg.author.tag} (${msg.author.id}) | AGE: ${ageDays}d | MSG: ${truncate(msg.content || '[no text]', 120)} | RESULT: action=${result.action} confidence=${confidence} isScam=${isScam} reason=${result.reason} deleted=${deleted ? 'Yes' : 'No'}`
+      `USER: ${msg.author.tag} (${msg.author.id}) | AGE: ${ageDays}d | WHERE: ${describeChannel(msg.channel)} | MSG: ${truncate(msg.content || '[no text]', 120)} | RESULT: action=${result.action} confidence=${confidence} isScam=${isScam} reason=${result.reason} deleted=${deleted ? 'Yes' : 'No'}`
     );
 
     if (deleted) {
@@ -61,9 +68,11 @@ const setupMessageCreate = (client) => {
       if (logChannel?.isTextBased()) {
         const embed = {
           title: `AegisChat Review: ${isScam ? 'SCAM DETECTED' : 'Suspicious'}`,
+          url: msg.url,
           description: truncate(msg.content || '[no text]', 500),
           fields: [
             { name: 'User', value: `${msg.author.tag} (${msg.author.id})`, inline: true },
+            { name: 'Channel', value: `<#${msg.channelId}>`, inline: true },
             { name: 'Confidence', value: `${confidence}%`, inline: true },
             { name: 'Reason', value: result.reason, inline: false },
             { name: 'Action', value: result.action, inline: true },
