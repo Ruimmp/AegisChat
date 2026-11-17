@@ -59,6 +59,19 @@ LEARNED_IMAGES_DIR=
    - **Embed Links**
    - **Manage Messages**
 
+### Channels covered
+
+The bot does not filter by channel type. Every channel that can carry messages inside the configured guild is monitored:
+
+- regular text channels and announcement channels;
+- the text chat built into voice and stage channels;
+- threads, including forum posts (a forum post is a thread).
+
+Coverage is therefore a matter of permissions, not configuration. For the bot to act in a given place it needs **View Channels**, **Read Message History** and **Manage Messages** there, either server-wide or through the channel and category overwrites. Two cases need attention:
+
+- **Voice and stage channels**: the text chat follows the channel's own **View Channels** overwrite, so a voice channel hidden from the bot's role is not monitored.
+- **Private threads**: Discord only delivers them to members of the thread or to apps with **Manage Threads** on the parent channel. Without one of the two, the bot never sees the messages.
+
 ## OpenRouter API Setup (Free)
 
 1. Sign up at [openrouter.ai](https://openrouter.ai)
