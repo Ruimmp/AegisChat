@@ -1,6 +1,10 @@
 const axios = require('axios');
 const { log } = require('../utils/logger');
 
+// Routed models often spend their whole budget on reasoning tokens and return an
+// empty content field. One extra attempt recovers that without burning the quota.
+const EMPTY_RESPONSE_ATTEMPTS = 2;
+
 const SYSTEM_PROMPT = `You are a Discord security moderator specializing in image scam detection. Analyze ONLY the visual content of the attached image(s). Look for: fake giveaways, impersonation of celebrities (MrBeast, Elon Musk), cryptocurrency fraud, fake withdrawal proofs, suspicious QR codes, phishing screenshots. If the image does not clearly show one of these signals, classify it as NOT a scam (isScam: false, action: "ignore"). Do not guess or infer intent from unrelated content such as app screenshots, personal photos, memes, or general chat images. IGNORE text-only messages without images. The "reason" field must cite the specific visual element that justifies the decision (e.g. "fake MrBeast giveaway banner", "crypto wallet QR code"); never state a scam type that is not visibly present in the image. Respond ONLY with valid JSON, no markdown, no explanations: {"isScam": boolean, "confidence": 0-100, "reason": "short string", "action": "delete" | "warn" | "ignore"}.`;
 
 const buildMessages = (prompt, imagesBase64 = []) => {
@@ -20,7 +24,7 @@ const buildMessages = (prompt, imagesBase64 = []) => {
 };
 
 const requestCompletion = async (prompt, imagesBase64, retries, backoff) => {
-  const { openRouterKey, model } = require('../config');
+  const { openRouterKey, model, aiMaxTokens } = require('../config');
 
   try {
     return await axios.post(
@@ -28,7 +32,7 @@ const requestCompletion = async (prompt, imagesBase64, retries, backoff) => {
       {
         model,
         messages: buildMessages(prompt, imagesBase64),
-        max_tokens: 512,
+        max_tokens: aiMaxTokens,
         temperature: 0.1,
       },
       {
@@ -64,22 +68,31 @@ const requestCompletion = async (prompt, imagesBase64, retries, backoff) => {
 };
 
 const callOpenRouter = async (prompt, imagesBase64 = [], retries = 5, backoff = 2000) => {
-  const response = await requestCompletion(prompt, imagesBase64, retries, backoff);
-  if (!response) return null;
+  for (let attempt = 1; attempt <= EMPTY_RESPONSE_ATTEMPTS; attempt++) {
+    const response = await requestCompletion(prompt, imagesBase64, retries, backoff);
+    if (!response) return null;
 
-  const content = response.data?.choices?.[0]?.message?.content?.trim();
-  if (!content) {
-    log.warn('OpenRouter returned an empty response, falling back to heuristics');
-    return null;
+    const choice = response.data?.choices?.[0];
+    const content = choice?.message?.content?.trim();
+
+    if (!content) {
+      const reasoningTokens = response.data?.usage?.completion_tokens_details?.reasoning_tokens;
+      log.warn(
+        `OpenRouter returned an empty response (model=${response.data?.model} finish=${choice?.finish_reason} reasoning_tokens=${reasoningTokens}), attempt ${attempt}/${EMPTY_RESPONSE_ATTEMPTS}`
+      );
+      continue;
+    }
+
+    const cleaned = content.replace(/```json|```/g, '').trim();
+    try {
+      return JSON.parse(cleaned);
+    } catch (err) {
+      log.warn(`OpenRouter returned invalid JSON, attempt ${attempt}/${EMPTY_RESPONSE_ATTEMPTS}: ${err.message}`);
+    }
   }
 
-  const cleaned = content.replace(/```json|```/g, '').trim();
-  try {
-    return JSON.parse(cleaned);
-  } catch (err) {
-    log.warn(`OpenRouter returned invalid JSON, falling back to heuristics: ${err.message}`);
-    return null;
-  }
+  log.warn('OpenRouter produced no usable answer, falling back to heuristics');
+  return null;
 };
 
 const analyzeMessage = async (content, userContext, imagesBase64 = []) => {

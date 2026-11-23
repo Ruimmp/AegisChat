@@ -1,4 +1,5 @@
 const { log } = require('../utils/logger');
+const { reviewThreshold } = require('../config');
 const { analyzeMessage } = require('./ai.service');
 const { downloadImageBuffer, toBase64DataUrl, computeImageHash } = require('../utils/imageDownloader');
 const { computePerceptualHash } = require('../utils/perceptualHash');
@@ -93,8 +94,9 @@ const scan = async (content, userContext, attachments = []) => {
     for (const url of imageUrls) {
       addToPendingQueue(url);
     }
-    log.debug(`AI unavailable, added ${imageUrls.length} image(s) to pending queue for later analysis`);
-    return { action: 'warn', confidence: 50, reason: 'AI unavailable, heuristics only', triggers };
+    log.warn(`AI unavailable, added ${imageUrls.length} image(s) to pending queue for later analysis`);
+    // Keep this at the review threshold so a failed analysis still reaches a human.
+    return { action: 'warn', confidence: reviewThreshold, reason: 'AI unavailable, heuristics only', triggers };
   }
 
   log.debug(`AI result: isScam=${aiResult.isScam} confidence=${aiResult.confidence} action=${aiResult.action} reason=${aiResult.reason}`);

@@ -1,14 +1,18 @@
 const axios = require('axios');
 const crypto = require('crypto');
 const { log } = require('./logger');
+const { maxImageBytes } = require('../config');
 
-const MAX_IMAGE_BYTES = 1_000_000;
+const formatBytes = (bytes) => `${(bytes / 1_000_000).toFixed(2)} MB`;
 
 const downloadImageBuffer = async (url) => {
   try {
     const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
     const buffer = Buffer.from(response.data, 'binary');
-    if (buffer.length > MAX_IMAGE_BYTES) return null;
+    if (buffer.length > maxImageBytes) {
+      log.warn(`Image skipped, ${formatBytes(buffer.length)} exceeds the ${formatBytes(maxImageBytes)} limit: ${url}`);
+      return null;
+    }
     const contentType = response.headers['content-type'] || 'image/png';
     const mimeType = contentType.split(';')[0].trim();
     return { buffer, mimeType };
