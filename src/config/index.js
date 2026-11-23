@@ -19,6 +19,7 @@ const config = {
   reviewThreshold: parseInt(process.env.REVIEW_THRESHOLD || '60', 10),
   phashThreshold: parseInt(process.env.PHASH_THRESHOLD || '8', 10),
   maxImageBytes: parseInt(process.env.MAX_IMAGE_BYTES || '10000000', 10),
+  aiMaxTokens: parseInt(process.env.AI_MAX_TOKENS || '1500', 10),
   logLevel: process.env.LOG_LEVEL || 'info',
   dbPath: process.env.DB_PATH || path.join(__dirname, '..', '..', 'aegis.db'),
   learnedImagesDir: process.env.LEARNED_IMAGES_DIR || path.join(__dirname, '..', '..', 'learned-images'),
